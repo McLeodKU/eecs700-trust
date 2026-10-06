@@ -1,0 +1,16 @@
+# Binaries under analysis are not tracked
+binaries/
+
+# Ghidra project databases (mounted at /projects in the container)
+ghidra-projects/
+
+# Native (non-container) install script, not part of the container setup
+install-ghidra-mcp.sh
+
+# Editor and build leftovers
+*.swp
+*~
+*.o
+a.out
+error.log
+score.txt
