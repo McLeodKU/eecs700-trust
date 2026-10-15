@@ -10,7 +10,6 @@ running in rootless Podman.
 |---|---|
 | `podman-ghidra-mcp.sh` | Builds and runs the Ghidra MCP containers and registers them with Claude Code |
 | `ghidra-mcp/` | Upstream GhidraMCP source (git submodule), used to build the images |
-| `getscore.c` | C code rebuilt from the `getscore` binary |
 
 Binaries (`binaries/`) and Ghidra project databases (`ghidra-projects/`) are
 not tracked.
@@ -35,7 +34,7 @@ binaries. It does not start on its own after a reboot; run
 
 ## Analyzing a binary - Claude code
 
-1. Copy the file into `binaries/`.
+1. Copy the file into `binaries/`. (Denote if obfuscation was applied or not)
 2. Start Claude Code from this directory and check that `ghidra` shows as connected in `/mcp`.
 3. Import the file by its **container** path, `/binaries/<name>`, not by the host path.
 
