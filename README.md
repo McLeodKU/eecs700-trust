@@ -44,21 +44,8 @@ binaries. It does not start on its own after a reboot; run
 | `./binaries` | `/binaries` (read-only) |
 | `./ghidra-projects` | `/projects` (read-write) |
 
-## getscore
-
-`getscore.c` is a C version of `binaries/getscore`, a 32-bit x86 ELF built
-with GCC 3.2 that is meant to run setuid. It runs `getscore name SSN`, finds
-`name:SSN:score:` in `score.txt`, and prints the score. Buffer sizes are
-inferred from the stack layout.
-
-Known vulnerabilities:
-
-- **Stack overflow:** `get_score` copies `name` and `SSN` into a 128-byte
-  buffer with `strcpy`/`strcat`, with no length check.
-- **Command injection:** a failed lookup passes `name` and `SSN` into a shell
-  command run by `system()`.
-- **Unbounded copy:** the score field is copied until the next `:`, with no
-  size limit.
-
 ## Analyzing a binary - Codex
 TODO
+
+## Dataset of vulnerable programs
+TODO - using exploitdb
