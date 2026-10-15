@@ -33,7 +33,7 @@ The pod has no network access (loopback only), so it is safe for untrusted
 binaries. It does not start on its own after a reboot; run
 `./podman-ghidra-mcp.sh up` again.
 
-## Analyzing a binary
+## Analyzing a binary - Claude code
 
 1. Copy the file into `binaries/`.
 2. Start Claude Code from this directory and check that `ghidra` shows as connected in `/mcp`.
@@ -59,3 +59,6 @@ Known vulnerabilities:
   command run by `system()`.
 - **Unbounded copy:** the score field is copied until the next `:`, with no
   size limit.
+
+## Analyzing a binary - Codex
+TODO
