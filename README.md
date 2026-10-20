@@ -24,6 +24,13 @@ cd eecs700-project
 ./podman-ghidra-mcp.sh install    # build images, start the pod, register the MCP server
 ```
 
+If you cloned without `--recurse-submodules`, `ghidra-mcp/` will be empty and
+the build fails with "ghidra-mcp repo not found". Fetch it first:
+
+```sh
+git submodule update --init
+```
+
 You can also run the steps one at a time: `build`, `up`, `register`. Other
 commands: `status`, `logs`, `down`. Add `--dry-run` before a command to print
 what it would run without running it.
