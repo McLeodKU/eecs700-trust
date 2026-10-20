@@ -1,5 +1,10 @@
-# Binaries under analysis are not tracked
-binaries/
+# Binaries under analysis are not tracked, except the apache2-study scripts
+binaries/*
+!binaries/apache2-study/
+binaries/apache2-study/*
+!binaries/apache2-study/fetch.sh
+!binaries/apache2-study/Containerfile
+!binaries/apache2-study/README.md
 
 # Ghidra project databases (mounted at /projects in the container)
 ghidra-projects/

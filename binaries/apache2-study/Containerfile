@@ -1,0 +1,56 @@
+# Containerfile — run a specific Debian apache2 build on the Debian release of its era.
+#
+# Start from the Debian release that was stable when this apache2 build appeared, point
+# apt at Debian unstable as of that moment on snapshot.debian.org, and install the exact
+# apache2 version. Everything apache2 depends on is moved to its version in that snapshot
+# (up or down), so apache2 runs against the libraries Debian shipped alongside it: the
+# same set ./fetch.sh lists in MANIFEST.
+#
+# Normally built by `./fetch.sh image <version>`, which looks up these arguments:
+#   BASE       e.g. docker.io/debian/eol:jessie
+#   SNAPSHOT   snapshot.debian.org timestamp, e.g. 20140608T163500Z
+#   VERSION    Debian package version, e.g. 2.4.9-2
+#
+# Run:  podman run --rm -p 8080:80 localhost/apache2-study:<upstream version>
+
+ARG BASE
+FROM ${BASE}
+
+ARG SNAPSHOT
+ARG VERSION
+
+# Old releases' signing keys have expired, so the archive is marked trusted; apt still
+# checks every package against the hashes in the snapshot's index. Plain http because
+# releases before stretch don't have apt-transport-https.
+# policy-rc.d stops the package scripts from trying to start the service during the build.
+RUN set -e; \
+    echo "deb [trusted=yes] http://snapshot.debian.org/archive/debian/${SNAPSHOT}/ sid main" > /etc/apt/sources.list; \
+    rm -f /etc/apt/sources.list.d/*; \
+    printf '#!/bin/sh\nexit 101\n' > /usr/sbin/policy-rc.d; chmod +x /usr/sbin/policy-rc.d; \
+    apt-get -o Acquire::Check-Valid-Until=false update; \
+    # The base image can be newer than the snapshot (e.g. jessie's final packages under a
+    # 2014 snapshot). Priority 1001 makes the snapshot's version the target for every
+    # package, even when that means a downgrade.
+    printf 'Package: *\nPin: origin "snapshot.debian.org"\nPin-Priority: 1001\n' \
+        > /etc/apt/preferences.d/snapshot; \
+    # apt < 1.1 (jessie) has only --force-yes for allowing downgrades.
+    if apt-get -s --allow-downgrades check >/dev/null 2>&1; \
+        then DOWNGRADE=--allow-downgrades; else DOWNGRADE=--force-yes; fi; \
+    # Only apache2-bin is pinned: in a rebuild (e.g. 2.4.58-1+b3) the other packages keep the
+    # plain version, and at this snapshot apt's candidate for them is the matching one anyway.
+    # Packages already in the base image that apache2 depends on (recursively) are named
+    # explicitly so apt moves them to the snapshot's version too; without that, apt keeps any
+    # installed version that satisfies the dependency. Only apache2's closure is touched: rolling
+    # back the whole base fails (e.g. 2014 systemd vs jessie's udev).
+    closure=$(apt-cache depends --recurse --important apache2 apache2-bin | grep -v '^[ <]' | sort -u); \
+    rollback=$(dpkg-query -W -f='${Status} ${Package}\n' $closure 2>/dev/null \
+               | awk '$3 == "installed" { print $4 }'); \
+    export DEBIAN_FRONTEND=noninteractive; \
+    apt-get install -y $DOWNGRADE --no-install-recommends apache2 apache2-bin=${VERSION} $rollback; \
+    rm -rf /var/lib/apt/lists/*; \
+    apache2ctl -v
+
+LABEL apache2-study.version="${VERSION}" apache2-study.snapshot="${SNAPSHOT}" apache2-study.base="${BASE}"
+EXPOSE 80
+# apache2 itself as PID 1 (apache2ctl is a shell script that doesn't pass SIGTERM along).
+CMD ["/bin/sh", "-c", ". /etc/apache2/envvars && mkdir -p \"$APACHE_RUN_DIR\" \"$APACHE_LOCK_DIR\" \"$APACHE_LOG_DIR\" && exec /usr/sbin/apache2 -DFOREGROUND"]
