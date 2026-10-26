@@ -51,6 +51,11 @@ RUN set -e; \
     apache2ctl -v
 
 LABEL apache2-study.version="${VERSION}" apache2-study.snapshot="${SNAPSHOT}" apache2-study.base="${BASE}"
+
+# Replace Debian's default "It works!" page with the bundled website template.
+# fetch.sh stages the extracted template under html/ in the build context.
+COPY html/ /var/www/html/
+
 EXPOSE 80
 # apache2 itself as PID 1 (apache2ctl is a shell script that doesn't pass SIGTERM along).
 CMD ["/bin/sh", "-c", ". /etc/apache2/envvars && mkdir -p \"$APACHE_RUN_DIR\" \"$APACHE_LOCK_DIR\" \"$APACHE_LOG_DIR\" && exec /usr/sbin/apache2 -DFOREGROUND"]

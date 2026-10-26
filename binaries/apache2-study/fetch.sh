@@ -267,15 +267,23 @@ image_version() {
     log "Building $IMAGE:$ver  (apache2 $debver, unstable @ $ts, on $base)"
     run buildah build --pull --format docker \
         --build-arg "BASE=$base" --build-arg "SNAPSHOT=$ts" --build-arg "VERSION=$debver" \
-        -t "$IMAGE:$ver" -f "$SCRIPT_DIR/Containerfile" "$SCRIPT_DIR/empty-context"
+        -t "$IMAGE:$ver" -f "$SCRIPT_DIR/Containerfile" "$BUILD_CTX"
     echo "  Run: podman run --rm -p 8080:80 $IMAGE:$ver"
 }
 
 cmd_image() {
     local v failed=()
     [[ $# -gt 0 ]] || die "give at least one version (see: ./fetch.sh list)"
-    # The Containerfile copies nothing in, so don't send ./build as build context.
-    run mkdir -p "$SCRIPT_DIR/empty-context"
+    # Build context holds only the website template the Containerfile copies into
+    # /var/www/html (not ./build, which can be large). Extract it once, reuse for every
+    # version. BUILD_CTX is read by image_version.
+    local tpl="$SCRIPT_DIR/resources/html5up-verti.zip"
+    [[ -f "$tpl" ]] || die "website template not found: $tpl"
+    # Unique per-run dir so concurrent builds don't clobber each other's context.
+    BUILD_CTX="$(mktemp -d "$SCRIPT_DIR/.build-context.XXXXXX")"
+    trap 'rm -rf "$BUILD_CTX"' RETURN
+    run mkdir -p "$BUILD_CTX/html"
+    run unzip -q -o "$tpl" -d "$BUILD_CTX/html"
     for v in "$@"; do
         set +e
         ( set -eE; trap 'warn "apache2 $v: command failed at line $LINENO: $BASH_COMMAND"' ERR
@@ -283,7 +291,7 @@ cmd_image() {
         [[ $? -eq 0 ]] || failed+=("$v")
         set -e
     done
-    run rmdir "$SCRIPT_DIR/empty-context"
+    run rm -rf "$BUILD_CTX"; trap - RETURN
     echo
     [[ ${#failed[@]} -eq 0 ]] || die "failed: ${failed[*]}"
 }
