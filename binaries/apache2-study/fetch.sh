@@ -279,8 +279,9 @@ cmd_image() {
     # version. BUILD_CTX is read by image_version.
     local tpl="$SCRIPT_DIR/resources/html5up-verti.zip"
     [[ -f "$tpl" ]] || die "website template not found: $tpl"
-    BUILD_CTX="$SCRIPT_DIR/build-context"
-    run rm -rf "$BUILD_CTX"
+    # Unique per-run dir so concurrent builds don't clobber each other's context.
+    BUILD_CTX="$(mktemp -d "$SCRIPT_DIR/.build-context.XXXXXX")"
+    trap 'rm -rf "$BUILD_CTX"' RETURN
     run mkdir -p "$BUILD_CTX/html"
     run unzip -q -o "$tpl" -d "$BUILD_CTX/html"
     for v in "$@"; do
@@ -290,7 +291,7 @@ cmd_image() {
         [[ $? -eq 0 ]] || failed+=("$v")
         set -e
     done
-    run rm -rf "$BUILD_CTX"
+    run rm -rf "$BUILD_CTX"; trap - RETURN
     echo
     [[ ${#failed[@]} -eq 0 ]] || die "failed: ${failed[*]}"
 }

@@ -15,7 +15,9 @@
 set -eu
 
 # 10 versions spread across the range fetch.sh offers (2.4.9 .. 2.4.69).
-DEFAULT_VERSIONS="2.4.9 2.4.16 2.4.23 2.4.29 2.4.37 2.4.43 2.4.49 2.4.54 2.4.59 2.4.69"
+# (2.4.53, not 2.4.54: the usr-merge-transition builds ~2.4.54..2.4.58 fail in a rootless
+# container — usrmerge's postinst can't convert the unmerged bullseye base.)
+DEFAULT_VERSIONS="2.4.9 2.4.16 2.4.23 2.4.29 2.4.37 2.4.43 2.4.49 2.4.53 2.4.59 2.4.69"
 
 NET=apache2-study-net
 VOL=apache2-study-nuclei-templates
@@ -38,17 +40,28 @@ echo "==> updating nuclei templates (podman volume $VOL)"
 podman volume create "$VOL" >/dev/null 2>&1 || true
 podman run --rm -v "$VOL":/root/nuclei-templates:Z "$NUCLEI_IMAGE" -update-templates
 
+failed=
 for v in $versions; do
     container="apache2-study-$(echo "$v" | tr '.' '-')"   # dots -> dashes for a clean DNS name
     report="reports/$v.txt"
     echo
     echo "==> $v"
 
+    # One version failing to build (e.g. the usrmerge transition ~2.4.54) must not abort
+    # the batch: record it and move on.
     echo "    building localhost/apache2-study:$v"
-    ./fetch.sh image "$v" >/dev/null
+    if ! ./fetch.sh image "$v" >/dev/null; then
+        echo "    BUILD FAILED — skipping (diagnose with: ./fetch.sh image $v)"
+        failed="$failed $v"
+        continue
+    fi
 
     podman rm -f "$container" >/dev/null 2>&1 || true
-    podman run -d --rm --name "$container" --network "$NET" "localhost/apache2-study:$v" >/dev/null
+    if ! podman run -d --rm --name "$container" --network "$NET" "localhost/apache2-study:$v" >/dev/null; then
+        echo "    RUN FAILED — skipping"
+        failed="$failed $v"
+        continue
+    fi
     sleep 2
 
     # Target the container's IP, not its name: under a full-template scan's concurrency,
@@ -62,7 +75,13 @@ for v in $versions; do
         -v "$VOL":/root/nuclei-templates:Z \
         -v ./reports:/reports:Z \
         "$NUCLEI_IMAGE" \
-        -u "http://$ip" -o "/reports/$v.txt" -duc || true
+        -u "http://$ip" -o "/reports/$v.txt" \
+        -duc -ni -timeout 5 -retries 0 || true
+        # -ni: no interactsh. The container has no outbound network, so OAST callbacks
+        #   can never arrive; without this nuclei polls the interactsh server at the end
+        #   and the scan hangs for minutes after the last HTTP finding.
+        # -timeout 5 / -retries 0: the target is a container on the same network (sub-ms
+        #   responses), so trim the waits non-HTTP templates spend on closed service ports.
 
     podman stop "$container" >/dev/null 2>&1 || true
     container=
@@ -72,3 +91,6 @@ done
 
 echo
 echo "==> done. Reports in reports/"
+if [ -n "$failed" ]; then
+    echo "==> versions that could not be built/scanned:$failed"
+fi
