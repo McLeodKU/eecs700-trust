@@ -1,0 +1,35 @@
+# Containerfile — add the era's MariaDB server to an apache2-study image, so each release is
+# paired with the database Debian shipped alongside it (MariaDB 5.5 for jessie ... 11.x for
+# trixie), listening on the container network for scanning.
+#
+# Built FROM localhost/apache2-study:<ver>: that image still points apt at its own moment on
+# snapshot.debian.org and pins every package to that snapshot, so installing mariadb-server
+# pulls the database version from the same era as the Apache build. Only the DB is added;
+# the Apache binary that came with the base image is left unused.
+#
+# Normally built by ./scan.sh, which passes:
+#   APACHE_IMAGE   e.g. localhost/apache2-study:2.4.49
+
+ARG APACHE_IMAGE
+FROM ${APACHE_IMAGE}
+
+# mariadb-server exists in every snapshot (MariaDB 5.5 in 2014 ... 11.x today). policy-rc.d
+# in the base image keeps the package from starting the service during the build.
+RUN set -e; \
+    apt-get -o Acquire::Check-Valid-Until=false update; \
+    export DEBIAN_FRONTEND=noninteractive; \
+    # jessie (apt < 1.1) only has --force-yes for installing the snapshot's pinned versions.
+    if apt-get -s --allow-downgrades check >/dev/null 2>&1; then DG=--allow-downgrades; else DG=--force-yes; fi; \
+    apt-get install -y --no-install-recommends $DG mariadb-server; \
+    rm -rf /var/lib/apt/lists/*; \
+    # Initialise the data directory now — Debian's postinst defers it to service start, which
+    # never runs here. Tool name differs by era: mariadb-install-db (new) vs mysql_install_db.
+    install -d -o mysql -g mysql /run/mysqld /var/run/mysqld; \
+    if command -v mariadb-install-db >/dev/null; then INIT=mariadb-install-db; else INIT=mysql_install_db; fi; \
+    [ "$(ls -A /var/lib/mysql 2>/dev/null)" ] || $INIT --user=mysql --datadir=/var/lib/mysql >/dev/null; \
+    dpkg-query -W -f='${Version}' mariadb-server > /etc/mariadb-study-version
+
+EXPOSE 3306
+# Run the DB in the foreground, bound to all interfaces so the scanner can reach 3306. The
+# server binary differs by era (mariadbd vs mysqld); the socket dir must exist before start.
+CMD ["/bin/sh", "-c", "install -d -o mysql -g mysql /run/mysqld /var/run/mysqld; if command -v mariadbd >/dev/null; then exec mariadbd --user=mysql --bind-address=0.0.0.0 --skip-name-resolve; else exec mysqld --user=mysql --bind-address=0.0.0.0 --skip-name-resolve; fi"]

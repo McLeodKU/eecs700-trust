@@ -1,0 +1,37 @@
+# Containerfile — add the era's PHP to an apache2-study image, with an exposed phpinfo()
+# page, so each Apache version is paired with the PHP that Debian shipped alongside it.
+#
+# Built FROM localhost/apache2-study:<ver>: that image still points apt at its own moment
+# on snapshot.debian.org and pins every package to that snapshot, so installing mod_php here
+# pulls the PHP version from the same era (PHP 5.6 for jessie ... 8.4 for trixie). Nothing
+# new is downloaded for the HTTP server — the Apache binary and libraries are reused as-is.
+#
+# Normally built by ./scan.sh, which passes:
+#   APACHE_IMAGE   e.g. localhost/apache2-study:2.4.49
+
+ARG APACHE_IMAGE
+FROM ${APACHE_IMAGE}
+
+# Debian's libapache2-mod-php postinst enables the module and switches Apache to the
+# prefork MPM (mod_php needs it) on its own; policy-rc.d in the base image keeps it from
+# trying to start the service during the build.
+RUN set -e; \
+    apt-get -o Acquire::Check-Valid-Until=false update; \
+    export DEBIAN_FRONTEND=noninteractive; \
+    # jessie (apt < 1.1) only has --force-yes for installing the snapshot's pinned versions.
+    if apt-get -s --allow-downgrades check >/dev/null 2>&1; then DG=--allow-downgrades; else DG=--force-yes; fi; \
+    # The mod_php metapackage (libapache2-mod-php -> the era's default PHP) exists from
+    # stretch on; jessie has libapache2-mod-php5 instead.
+    if apt-cache show libapache2-mod-php 2>/dev/null | grep -q '^Package:'; \
+        then PKG=libapache2-mod-php; else PKG=libapache2-mod-php5; fi; \
+    apt-get install -y --no-install-recommends $DG $PKG; \
+    rm -rf /var/lib/apt/lists/*; \
+    # Record the PHP version Debian pulled, so ./scan.sh can label the scan.
+    modpkg=$(dpkg-query -W -f='${Package}\n' | grep -m1 -E '^libapache2-mod-php[0-9]'); \
+    dpkg-query -W -f='${Version}' "$modpkg" > /etc/php-study-version; \
+    echo "PHP: $(cat /etc/php-study-version)"
+
+# Exposed phpinfo() page alongside the website template the base image already serves.
+COPY info.php /var/www/html/info.php
+
+LABEL php-study.apache-image="${APACHE_IMAGE}"
