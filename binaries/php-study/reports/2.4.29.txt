@@ -1,0 +1,15 @@
+[phpinfo-files] [http] [low] http://10.89.0.8/info.php ["7.0.27"] [paths="/info.php"]
+[waf-fuzz:apachegeneric] [http] [info] http://10.89.0.8 [whatwaf-payloads="\\'))) AND \\'1\\'=\\'1\\' (((\\'"]
+[waf-detect:apachegeneric] [http] [info] http://10.89.0.8
+[options-method] [http] [info] http://10.89.0.8 ["POST,OPTIONS,HEAD,GET"]
+[apache-detect] [http] [info] http://10.89.0.8 ["Apache/2.4.29 (Debian)"]
+[http-missing-security-headers:cross-origin-resource-policy] [http] [info] http://10.89.0.8
+[http-missing-security-headers:strict-transport-security] [http] [info] http://10.89.0.8
+[http-missing-security-headers:content-security-policy] [http] [info] http://10.89.0.8
+[http-missing-security-headers:permissions-policy] [http] [info] http://10.89.0.8
+[http-missing-security-headers:x-frame-options] [http] [info] http://10.89.0.8
+[http-missing-security-headers:x-permitted-cross-domain-policies] [http] [info] http://10.89.0.8
+[http-missing-security-headers:cross-origin-embedder-policy] [http] [info] http://10.89.0.8
+[http-missing-security-headers:cross-origin-opener-policy] [http] [info] http://10.89.0.8
+[http-missing-security-headers:x-content-type-options] [http] [info] http://10.89.0.8
+[http-missing-security-headers:referrer-policy] [http] [info] http://10.89.0.8
