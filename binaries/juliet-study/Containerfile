@@ -1,0 +1,4 @@
+FROM docker.io/library/debian:trixie
+
+# The analysis only requires clang (for the scan-build and ASan) and gcc.
+RUN apt-get update && apt-get install -y gcc clang && rm -rf /var/lib/apt/lists/*
