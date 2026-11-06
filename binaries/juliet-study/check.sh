@@ -1,10 +1,6 @@
-#WARNING: CLAUDE SLOP
-#CONTAINERIZATION REQUIRED (coming soon)
-
-
-
-
 #!/usr/bin/env bash
+#WARNING: CLAUDE SLOP
+
 # check.sh — check one C source file (original Juliet or LLM-decompiled) for memory bugs
 # with the Clang Static Analyzer and AddressSanitizer, and write both results to one report.
 #
